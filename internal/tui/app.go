@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -93,13 +94,16 @@ func (a *App) setupUI() {
 		return event
 	})
 
-	a.log("INFO: Application started. Press Space to select, 'd' to download, 'x' to delete, 'r' to rename, 'q' to quit.")
+	fmt.Fprint(a.logView, "INFO: Application started. Press Space to select, 'd' to download, 'x' to delete, 'r' to rename, 'q' to quit.\n")
 }
 
 // log writes a message to the log view safely.
 func (a *App) log(msg string) {
+	txt := fmt.Sprintf("%s %s\n", time.Now().Format("15:04:05"), msg)
+	
+	// Safe to call from background goroutines
 	a.app.QueueUpdateDraw(func() {
-		fmt.Fprintf(a.logView, "%s %s\n", time.Now().Format("15:04:05"), msg)
+		fmt.Fprint(a.logView, txt)
 		a.logView.ScrollToEnd()
 	})
 }
@@ -109,11 +113,11 @@ func (a *App) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	a.log("INFO: Connecting to device...")
+	fmt.Fprint(a.logView, "INFO: Connecting to device...\n")
 	if err := a.client.Connect(ctx); err != nil {
-		a.log(fmt.Sprintf("[red]ERROR: Could not connect:[white] %v", err))
+		fmt.Fprintf(a.logView, "[red]ERROR: Could not connect:[white] %v\n", err)
 	} else {
-		a.log("[green]INFO: Connected successfully.[white]")
+		fmt.Fprint(a.logView, "[green]INFO: Connected successfully.[white]\n")
 		go a.loadData()
 	}
 
@@ -130,14 +134,6 @@ func (a *App) loadData() {
 	} else {
 		a.mu.Lock()
 		a.deviceInfo = info
-		
-		// Add logs node based on ssdPath if available
-		if ssdPath, ok := info["ssdPath"].(string); ok {
-			a.projects["Logs"] = vega.ProjectInfo{
-				Path:     filepath.Join(ssdPath, "TX3App/log"),
-				DateTime: time.Now().String(),
-			}
-		}
 		a.mu.Unlock()
 		a.updateDeviceInfo()
 	}
@@ -151,6 +147,16 @@ func (a *App) loadData() {
 	
 	a.mu.Lock()
 	a.projects = projects
+	
+	// Add logs node based on ssdPath if available
+	if a.deviceInfo != nil {
+		if ssdPath, ok := a.deviceInfo["ssdPath"].(string); ok {
+			a.projects["Logs"] = vega.ProjectInfo{
+				Path:     filepath.Join(ssdPath, "TX3App/log"),
+				DateTime: time.Now().String(),
+			}
+		}
+	}
 	a.mu.Unlock()
 
 	a.app.QueueUpdateDraw(func() {
@@ -158,7 +164,15 @@ func (a *App) loadData() {
 			SetColor(tcell.ColorGreen).
 			SetSelectable(false)
 		
-		for name, proj := range projects {
+		// Sort project names
+		var projectNames []string
+		for name := range a.projects {
+			projectNames = append(projectNames, name)
+		}
+		sort.Strings(projectNames)
+		
+		for _, name := range projectNames {
+			proj := a.projects[name]
 			node := tview.NewTreeNode(name).
 				SetColor(tcell.ColorYellow).
 				SetSelectable(true).
@@ -287,6 +301,9 @@ func buildTree(root *tview.TreeNode, basePath string, paths []string) {
 	// Simple map-based approach to build the tree.
 	nodes := make(map[string]*tview.TreeNode)
 	nodes[""] = root // root corresponds to basePath
+
+	// Sort paths so we iterate in deterministic alphabetical order
+	sort.Strings(paths)
 
 	for _, p := range paths {
 		// Remove basePath from p to get relative path
