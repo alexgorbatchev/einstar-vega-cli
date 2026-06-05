@@ -37,6 +37,8 @@ type App struct {
 	
 	// Track file sizes
 	nodeSizes map[*tview.TreeNode]uint64
+	
+	lastTreeWidth int
 
 	mu sync.Mutex
 }
@@ -63,22 +65,30 @@ func (a *App) setupUI() {
 	a.tree.SetBorder(true).SetTitle(" Files ").SetTitleAlign(tview.AlignLeft)
 	a.infoView.SetBorder(true).SetTitle(" Device Info ").SetTitleAlign(tview.AlignLeft)
 	a.logView.SetBorder(true).SetTitle(" Logs ").SetTitleAlign(tview.AlignLeft)
-	
-	// Create a help text view at the bottom
-	helpText := tview.NewTextView().
-		SetDynamicColors(true).
-		SetText(" [yellow]Space[white]: Select  [yellow]Enter[white]: Expand/Collapse  [yellow]d[white]: Download  [yellow]x[white]: Delete  [yellow]r[white]: Rename  [yellow]q[white]: Quit")
 
 	topFlex := tview.NewFlex().
 		AddItem(a.tree, 0, 1, true).
 		AddItem(a.infoView, 0, 1, false)
 
+	legend := tview.NewTextView().
+		SetDynamicColors(true).
+		SetText(" [yellow]Space[white] Select  [yellow]Enter[white] Expand  [yellow]d[white] Download  [yellow]r[white] Rename  [yellow]x[white] Delete  [yellow]q[white] Quit")
+
 	a.layout = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(topFlex, 0, 3, true).
 		AddItem(a.logView, 0, 1, false).
-		AddItem(helpText, 1, 0, false)
+		AddItem(legend, 1, 0, false)
 
 	a.app.SetRoot(a.layout, true).SetFocus(a.tree)
+
+	a.app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		_, _, w, _ := a.tree.GetInnerRect()
+		if w != a.lastTreeWidth && w > 0 {
+			a.lastTreeWidth = w
+			a.realignAllNodes()
+		}
+		return false
+	})
 
 	a.tree.SetSelectedFunc(a.onTreeSelected)
 	a.tree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -402,56 +412,76 @@ func (a *App) updateNodeText(node *tview.TreeNode) {
 	a.updateNodeTextLocked(node)
 }
 
+func (a *App) realignAllNodes() {
+	root := a.tree.GetRoot()
+	if root != nil {
+		a.mu.Lock()
+		a.realignNodeRecursive(root)
+		a.mu.Unlock()
+	}
+}
+
+func (a *App) realignNodeRecursive(node *tview.TreeNode) {
+	a.updateNodeTextLocked(node)
+	for _, child := range node.GetChildren() {
+		a.realignNodeRecursive(child)
+	}
+}
+
 func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	origName := getOriginalName(node)
 	isSelected := a.selectedNodes[node]
 	size := a.nodeSizes[node]
 
 	sizeStr := ""
-	if size > 0 || len(node.GetChildren()) == 0 { // Show 0 B for empty files, but don't show 0 B for empty dirs (unless we want to)
+	if size > 0 || len(node.GetChildren()) == 0 { // Show 0 B for empty files
 		sizeStr = formatSize(size)
 	}
 
-	// Calculate depth
-	level := node.GetLevel()
-	if level < 1 {
-		level = 1
-	}
-
-	// We want the size to align around column 55. 
-	// The tree view uses some graphics: about 4 characters per level.
-	// We only pad if we're not the root node.
 	if node == a.tree.GetRoot() {
 		node.SetText(origName)
 		return
 	}
 
-	visualLen := (level * 4) + len(origName) + 1
-	targetCol := 60
-	
-	paddingLen := targetCol - visualLen
-	if paddingLen < 2 {
-		paddingLen = 2
-	}
-	padding := strings.Repeat(" ", paddingLen)
-
-	var newText string
-	if sizeStr != "" {
-		newText = fmt.Sprintf(" %s%s%8s ", origName, padding, sizeStr)
-	} else {
-		// Even without size, pad it to maintain selection alignment if needed
-		newText = fmt.Sprintf(" %s ", origName)
+	level := node.GetLevel()
+	if level < 1 {
+		level = 1
 	}
 
-	if isSelected {
-		if sizeStr != "" {
-			newText = fmt.Sprintf(" %s%s%8s <- ", origName, padding, sizeStr)
-		} else {
-			// Maintain exact same right-edge alignment for <- by pushing it all the way to targetCol
-			newText = fmt.Sprintf(" %s%s%8s <- ", origName, padding, "")
+	width := a.lastTreeWidth
+	if width <= 0 {
+		_, _, width, _ = a.tree.GetInnerRect()
+		if width <= 0 {
+			if width <= 0 {
+				width = 80 // Reasonable default if everything fails
+			}
 		}
 	}
 
+	// Visual offset created by tview tree graphics (approx 4 chars per level) + 1 space we add manually
+	textStartCol := (level * 4) + 1
+
+	var rightBlock string
+	if isSelected {
+		if sizeStr != "" {
+			rightBlock = sizeStr + " <-"
+		} else {
+			rightBlock = "<-"
+		}
+	} else {
+		rightBlock = sizeStr
+	}
+
+	// Calculate padding to push rightBlock to the right edge.
+	// We want rightBlock to end 1 character before the actual edge width.
+	// So padding = width - 1 - textStartCol - len(origName) - len(rightBlock)
+	paddingLen := width - 1 - textStartCol - len(origName) - len(rightBlock)
+	if paddingLen < 2 {
+		paddingLen = 2
+	}
+
+	padding := strings.Repeat(" ", paddingLen)
+	newText := fmt.Sprintf(" %s%s%s", origName, padding, rightBlock)
 	node.SetText(newText)
 }
 
