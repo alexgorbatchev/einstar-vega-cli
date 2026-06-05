@@ -348,26 +348,14 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 
 func getOriginalName(node *tview.TreeNode) string {
 	text := node.GetText()
-	// Strip known formatting
+	text = strings.TrimSuffix(text, " <- ")
 	text = strings.TrimPrefix(text, " ")
 	
-	// Check if it has a size and strip it. The size is padded and formatted: ` (size)`
-	// We'll just look for the `(` character and assume it's the size if it's there.
-	// But actually, we know size is added at the end.
-	// Easiest is to regex it or simply trim ` <- ` first.
-	if strings.HasSuffix(text, " <- ") {
-		text = strings.TrimSuffix(text, " <- ")
-	} else {
-		text = strings.TrimSuffix(text, " ")
-	}
-
-	if idx := strings.LastIndex(text, "  "); idx != -1 {
-		// Because we padded it with spaces, we can just cut off at the first double space.
-		// Or better yet, we just remove everything from the last "  " onwards.
+	if idx := strings.Index(text, "  "); idx != -1 {
 		text = text[:idx]
 	}
 	
-	return strings.TrimSpace(text)
+	return strings.TrimRight(text, " ")
 }
 
 func isProjectNode(node *tview.TreeNode, projects map[string]vega.ProjectInfo) bool {
@@ -451,6 +439,7 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	if sizeStr != "" {
 		newText = fmt.Sprintf(" %s%s%8s ", origName, padding, sizeStr)
 	} else {
+		// Even without size, pad it to maintain selection alignment if needed
 		newText = fmt.Sprintf(" %s ", origName)
 	}
 
@@ -458,7 +447,8 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 		if sizeStr != "" {
 			newText = fmt.Sprintf(" %s%s%8s <- ", origName, padding, sizeStr)
 		} else {
-			newText = fmt.Sprintf(" %s <- ", origName)
+			// Maintain exact same right-edge alignment for <- by pushing it all the way to targetCol
+			newText = fmt.Sprintf(" %s%s%8s <- ", origName, padding, "")
 		}
 	}
 
