@@ -160,7 +160,7 @@ func (a *App) loadData() {
 	a.mu.Unlock()
 
 	a.app.QueueUpdateDraw(func() {
-		root := tview.NewTreeNode("Vega Scanner").
+		root := tview.NewTreeNode(" Vega Scanner").
 			SetColor(tcell.ColorGreen).
 			SetSelectable(false)
 		
@@ -173,7 +173,7 @@ func (a *App) loadData() {
 		
 		for _, name := range projectNames {
 			proj := a.projects[name]
-			node := tview.NewTreeNode(name).
+			node := tview.NewTreeNode(" " + name).
 				SetColor(tcell.ColorYellow).
 				SetSelectable(true).
 				SetExpanded(false).
@@ -235,9 +235,14 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 	}
 }
 
+func getOriginalName(node *tview.TreeNode) string {
+	return strings.TrimSuffix(strings.TrimPrefix(node.GetText(), " "), " *")
+}
+
 func isProjectNode(node *tview.TreeNode, projects map[string]vega.ProjectInfo) bool {
-	for name := range projects {
-		if node.GetText() == name {
+	name := getOriginalName(node)
+	for pName := range projects {
+		if name == pName {
 			return true
 		}
 	}
@@ -253,12 +258,16 @@ func (a *App) toggleSelection() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	origName := getOriginalName(node)
+
 	if a.selectedNodes[node] {
 		delete(a.selectedNodes, node)
 		a.updateNodeColor(node)
+		node.SetText(" " + origName)
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
+		node.SetText(" " + origName + " *")
 	}
 }
 
@@ -272,7 +281,7 @@ func (a *App) updateNodeColor(node *tview.TreeNode) {
 
 func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
 	ctx := context.Background()
-	a.log(fmt.Sprintf("INFO: Fetching files for %s...", node.GetText()))
+	a.log(fmt.Sprintf("INFO: Fetching files for %s...", getOriginalName(node)))
 	
 	paths, err := a.client.ListFilePaths(ctx, basePath)
 	if err != nil {
@@ -285,7 +294,7 @@ func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
 	a.app.QueueUpdateDraw(func() {
 		node.SetColor(tcell.ColorYellow)
 		if len(paths) == 0 {
-			a.log(fmt.Sprintf("INFO: No files found in %s", node.GetText()))
+			a.log(fmt.Sprintf("INFO: No files found in %s", getOriginalName(node)))
 			return
 		}
 
@@ -293,7 +302,7 @@ func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
 		node.SetExpanded(true)
 	})
 	
-	a.log(fmt.Sprintf("INFO: Loaded %d files for %s", len(paths), node.GetText()))
+	a.log(fmt.Sprintf("INFO: Loaded %d files for %s", len(paths), getOriginalName(node)))
 }
 
 // buildTree constructs a tree from a flat list of paths.
@@ -324,7 +333,7 @@ func buildTree(root *tview.TreeNode, basePath string, paths []string) {
 			}
 			
 			if _, exists := nodes[currentPath]; !exists {
-				node := tview.NewTreeNode(part).
+				node := tview.NewTreeNode(" " + part).
 					SetSelectable(true).
 					SetExpanded(false).
 					SetReference(p) // absolute path
@@ -413,16 +422,16 @@ func (a *App) downloadNode(node *tview.TreeNode) {
 			return
 		}
 
-		a.log(fmt.Sprintf("INFO: Starting directory download (%d files)...", len(files)))
-		for _, f := range files {
-			a.downloadSingleFile(f, basePath)
+			a.log(fmt.Sprintf("INFO: Starting directory download (%d files)...", len(files)))
+			for _, f := range files {
+				a.downloadSingleFile(f, basePath)
+			}
+			a.log(fmt.Sprintf("[green]INFO: Directory download complete: %s[white]", getOriginalName(node)))
+		} else {
+			basePath := a.findBasePath(node)
+			a.downloadSingleFile(path, basePath)
 		}
-		a.log(fmt.Sprintf("[green]INFO: Directory download complete: %s[white]", node.GetText()))
-	} else {
-		basePath := a.findBasePath(node)
-		a.downloadSingleFile(path, basePath)
 	}
-}
 
 func (a *App) gatherFiles(node *tview.TreeNode, files *[]string) {
 	if len(node.GetChildren()) == 0 {
@@ -486,7 +495,7 @@ func (a *App) getProjectNameForNode(node *tview.TreeNode) string {
 	root := a.tree.GetRoot()
 	for _, p := range root.GetChildren() {
 		if isNodeInSubtree(p, node) {
-			return p.GetText()
+			return getOriginalName(p)
 		}
 	}
 	return "unknown"
