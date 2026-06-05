@@ -471,13 +471,10 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	}
 
 	// Determine exact tview visual offset
-	// By default: Level 0 (root) has 0 graphics.
-	// Level 1: `├─` = 2 cells.
-	// Level 2: `│ ├─` = 4 cells.
-	// Level 3: `│ │ ├─` = 6 cells.
-	// General formula for tview tree node text X-coordinate (assuming default indent of 2 and root visible):
-	// textX = level * 2
-	textStartCol := (level * 2) + 1 // +1 for our manual space
+	// From reading tview TreeView source code:
+	// A node at level L has its text drawn at X = 2 + (L * 2) if root is visible.
+	// We add 1 for our manual space.
+	textStartCol := 2 + (level * 2) + 1
 
 	// Ensure the size string itself is a fixed width (e.g. 9 chars for "14.5 MB" or "842 B")
 	// so that the numbers align perfectly in a vertical column, regardless of their length.
