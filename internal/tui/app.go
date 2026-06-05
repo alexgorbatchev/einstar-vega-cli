@@ -166,7 +166,7 @@ func (a *App) loadData() {
 	a.mu.Unlock()
 
 	a.app.QueueUpdateDraw(func() {
-		root := tview.NewTreeNode(" Vega Scanner").
+		root := tview.NewTreeNode("/").
 			SetColor(tcell.ColorGreen).
 			SetSelectable(false)
 		
@@ -219,23 +219,50 @@ func (a *App) updateDeviceInfo() {
 
 		sort.Strings(regularKeys)
 
+		maxLen := 0
 		for _, k := range regularKeys {
-			fmt.Fprintf(a.infoView, "[blue]%s:[white] %v\n", k, a.deviceInfo[k])
+			if len(k) > maxLen {
+				maxLen = len(k)
+			}
+		}
+
+		for _, k := range regularKeys {
+			val := a.deviceInfo[k]
+			if k == "batteryValue" {
+				if vF, ok := val.(float64); ok {
+					val = fmt.Sprintf("%.0f%%", vF*100)
+				}
+			}
+			fmt.Fprintf(a.infoView, "[blue]%-*s[white] %v\n", maxLen+1, k+":", val)
 		}
 
 		if deviceParams != nil {
 			fmt.Fprintf(a.infoView, "\n[yellow]Device Params[white]\n")
 			if dpStr, ok := deviceParams.(string); ok {
 				parts := strings.Split(dpStr, "_")
+				var parsedParts []struct{k, v string}
+				maxPLen := 0
 				for _, p := range parts {
 					p = strings.TrimSpace(p)
 					if p == "" {
 						continue
 					}
 					if idx := strings.Index(p, ":"); idx != -1 {
-						fmt.Fprintf(a.infoView, "  [blue]%s:[white] %s\n", strings.TrimSpace(p[:idx]), strings.TrimSpace(p[idx+1:]))
+						k := strings.TrimSpace(p[:idx])
+						v := strings.TrimSpace(p[idx+1:])
+						parsedParts = append(parsedParts, struct{k, v string}{k, v})
+						if len(k) > maxPLen {
+							maxPLen = len(k)
+						}
 					} else {
-						fmt.Fprintf(a.infoView, "  [blue]%s[white]\n", p)
+						parsedParts = append(parsedParts, struct{k, v string}{p, ""})
+					}
+				}
+				for _, p := range parsedParts {
+					if p.v != "" {
+						fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %s\n", maxPLen+1, p.k+":", p.v)
+					} else {
+						fmt.Fprintf(a.infoView, "  [blue]%s[white]\n", p.k)
 					}
 				}
 			} else {
@@ -248,12 +275,16 @@ func (a *App) updateDeviceInfo() {
 			switch val := boardInfo.(type) {
 			case map[string]interface{}:
 				var keys []string
+				maxBLen := 0
 				for k := range val {
 					keys = append(keys, k)
+					if len(k) > maxBLen {
+						maxBLen = len(k)
+					}
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					fmt.Fprintf(a.infoView, "  [blue]%s:[white] %v\n", k, val[k])
+					fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %v\n", maxBLen+1, k+":", val[k])
 				}
 			case map[interface{}]interface{}:
 				type kv struct {
@@ -261,12 +292,17 @@ func (a *App) updateDeviceInfo() {
 					v interface{}
 				}
 				var kvs []kv
+				maxBLen := 0
 				for k, v := range val {
-					kvs = append(kvs, kv{fmt.Sprintf("%v", k), v})
+					kStr := fmt.Sprintf("%v", k)
+					kvs = append(kvs, kv{kStr, v})
+					if len(kStr) > maxBLen {
+						maxBLen = len(kStr)
+					}
 				}
 				sort.Slice(kvs, func(i, j int) bool { return kvs[i].k < kvs[j].k })
 				for _, pair := range kvs {
-					fmt.Fprintf(a.infoView, "  [blue]%s:[white] %v\n", pair.k, pair.v)
+					fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %v\n", maxBLen+1, pair.k+":", pair.v)
 				}
 			default:
 				fmt.Fprintf(a.infoView, "  %v\n", boardInfo)
@@ -308,7 +344,12 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 }
 
 func getOriginalName(node *tview.TreeNode) string {
-	return strings.TrimSuffix(strings.TrimPrefix(node.GetText(), " "), " * ")
+	text := node.GetText()
+	text = strings.TrimPrefix(text, " ")
+	if strings.HasSuffix(text, "* ") {
+		return strings.TrimSuffix(text, "* ")
+	}
+	return strings.TrimSuffix(text, " ")
 }
 
 func isProjectNode(node *tview.TreeNode, projects map[string]vega.ProjectInfo) bool {
@@ -339,7 +380,7 @@ func (a *App) toggleSelection() {
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
-		node.SetText(" " + origName + " * ")
+		node.SetText(" " + origName + "* ")
 	}
 }
 
