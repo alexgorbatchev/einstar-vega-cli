@@ -11,7 +11,7 @@ import (
 
 func main() {
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("connect success"))
+		_, _ = w.Write([]byte("connect success"))
 	})
 
 	http.HandleFunc("/request/deviceInfo", func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func main() {
 			},
 		}
 		b, _ := cbor.Marshal(payload)
-		w.Write(b)
+		_, _ = w.Write(b)
 	})
 
 	http.HandleFunc("/request/projectsInfo", func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func main() {
 			},
 		}
 		b, _ := cbor.Marshal(payload)
-		w.Write(b)
+		_, _ = w.Write(b)
 	})
 
 	http.HandleFunc("/request/listFilePaths", func(w http.ResponseWriter, r *http.Request) {
@@ -57,16 +57,16 @@ func main() {
 			},
 		}
 		b, _ := cbor.Marshal(payload)
-		w.Write(b)
+		_, _ = w.Write(b)
 	})
 
 	http.HandleFunc("/file/info", func(w http.ResponseWriter, r *http.Request) {
 		// Mock size 1024 bytes
-		binary.Write(w, binary.BigEndian, uint64(1024))
+		_ = binary.Write(w, binary.BigEndian, uint64(1024))
 	})
 
 	http.HandleFunc("/file/content", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(make([]byte, 1024))
+		_, _ = w.Write(make([]byte, 1024))
 	})
 
 	fmt.Println("Mock Vega server listening on :8080...")

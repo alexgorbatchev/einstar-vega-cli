@@ -16,6 +16,7 @@ test:
 lint:
 	go fmt ./...
 	go vet ./...
+	go tool golangci-lint run
 
 # Create a clean release build using GoReleaser (requires goreleaser installed)
 release:

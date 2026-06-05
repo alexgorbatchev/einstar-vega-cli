@@ -615,12 +615,6 @@ func (a *App) backgroundScanAllProjects(projectNodes []*tview.TreeNode) {
 		return leaves
 	}
 
-func (a *App) propagateSizeUp(node *tview.TreeNode, addedSize uint64) {
-	// TreeNode doesn't have GetParent. We must search from root or traverse our own structure.
-	// We can recursively walk the tree and update all node sizes.
-	// But it's easier to just compute sizes bottom-up in a full tree pass.
-}
-
 func (a *App) refreshAllNodeSizes() {
 	a.app.QueueUpdateDraw(func() {
 		a.mu.Lock()
@@ -803,48 +797,9 @@ func (a *App) findBasePath(node *tview.TreeNode) string {
 				}
 			}
 		}
-		// Look up parent manually since TreeNode doesn't have GetParent
-		// Actually, we can search from root if needed, but it's easier to just pass the project node down.
-		// For now, let's trace from root to find the node and its project parent.
-		break
+		curr = getParent(a.tree.GetRoot(), curr)
 	}
-	
-	// Brute force trace from root
-	root := a.tree.GetRoot()
-	for _, p := range root.GetChildren() {
-		if isNodeInSubtree(p, node) {
-			if ref := p.GetReference(); ref != nil {
-				if path, ok := ref.(string); ok {
-					// We also need the project name to append to outDir
-					return path
-				}
-			}
-		}
-	}
-	
 	return ""
-}
-
-func isNodeInSubtree(root, target *tview.TreeNode) bool {
-	if root == target {
-		return true
-	}
-	for _, child := range root.GetChildren() {
-		if isNodeInSubtree(child, target) {
-			return true
-		}
-	}
-	return false
-}
-
-func (a *App) getProjectNameForNode(node *tview.TreeNode) string {
-	root := a.tree.GetRoot()
-	for _, p := range root.GetChildren() {
-		if isNodeInSubtree(p, node) {
-			return getOriginalName(p)
-		}
-	}
-	return "unknown"
 }
 
 func (a *App) deleteSelected() {
