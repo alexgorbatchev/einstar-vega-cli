@@ -461,6 +461,15 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	// Visual offset created by tview tree graphics (approx 4 chars per level) + 1 space we add manually
 	textStartCol := (level * 4) + 1
 
+	// Ensure the size string itself is a fixed width (e.g. 9 chars for "14.5 MB" or "842 B")
+	// so that the numbers align perfectly in a vertical column, regardless of their length.
+	if sizeStr != "" {
+		sizeWidth := 9
+		if len(sizeStr) < sizeWidth {
+			sizeStr = strings.Repeat(" ", sizeWidth-len(sizeStr)) + sizeStr
+		}
+	}
+
 	var rightBlock string
 	if isSelected {
 		if sizeStr != "" {
