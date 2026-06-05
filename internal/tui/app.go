@@ -140,7 +140,7 @@ func (a *App) Run() error {
 	if err := a.client.Connect(ctx); err != nil {
 		_, _ = fmt.Fprintf(a.logView, "[red]ERROR: Could not connect:[white] %v\n", err)
 	} else {
-		fmt.Fprint(a.logView, "[green]INFO: Connected successfully.[white]\n")
+		_, _ = fmt.Fprint(a.logView, "[green]INFO: Connected successfully.[white]\n")
 		go a.loadData()
 	}
 
