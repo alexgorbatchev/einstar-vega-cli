@@ -464,18 +464,17 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	var rightBlock string
 	if isSelected {
 		if sizeStr != "" {
-			rightBlock = sizeStr + " <-"
+			rightBlock = sizeStr + " <- "
 		} else {
-			rightBlock = "<-"
+			rightBlock = "<- "
 		}
 	} else {
-		rightBlock = sizeStr
+		rightBlock = sizeStr + " "
 	}
 
 	// Calculate padding to push rightBlock to the right edge.
-	// We want rightBlock to end 1 character before the actual edge width.
-	// So padding = width - 1 - textStartCol - len(origName) - len(rightBlock)
-	paddingLen := width - 1 - textStartCol - len(origName) - len(rightBlock)
+	// We no longer need the - 1 here, because rightBlock already includes the trailing space!
+	paddingLen := width - textStartCol - len(origName) - len(rightBlock)
 	if paddingLen < 2 {
 		paddingLen = 2
 	}
