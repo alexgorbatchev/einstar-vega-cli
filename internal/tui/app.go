@@ -173,7 +173,7 @@ func (a *App) loadData() {
 		
 		for _, name := range projectNames {
 			proj := a.projects[name]
-			node := tview.NewTreeNode(" " + name).
+			node := tview.NewTreeNode(" " + name + " ").
 				SetColor(tcell.ColorYellow).
 				SetSelectable(true).
 				SetExpanded(false).
@@ -236,7 +236,7 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 }
 
 func getOriginalName(node *tview.TreeNode) string {
-	return strings.TrimSuffix(strings.TrimPrefix(node.GetText(), " "), " *")
+	return strings.TrimSuffix(strings.TrimPrefix(node.GetText(), " "), " * ")
 }
 
 func isProjectNode(node *tview.TreeNode, projects map[string]vega.ProjectInfo) bool {
@@ -263,11 +263,11 @@ func (a *App) toggleSelection() {
 	if a.selectedNodes[node] {
 		delete(a.selectedNodes, node)
 		a.updateNodeColor(node)
-		node.SetText(" " + origName)
+		node.SetText(" " + origName + " ")
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
-		node.SetText(" " + origName + " *")
+		node.SetText(" " + origName + " * ")
 	}
 }
 
@@ -333,7 +333,7 @@ func buildTree(root *tview.TreeNode, basePath string, paths []string) {
 			}
 			
 			if _, exists := nodes[currentPath]; !exists {
-				node := tview.NewTreeNode(" " + part).
+				node := tview.NewTreeNode(" " + part + " ").
 					SetSelectable(true).
 					SetExpanded(false).
 					SetReference(p) // absolute path
