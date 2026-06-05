@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/einstar/vega-cli/internal/vega"
 	"github.com/gdamore/tcell/v2"
@@ -471,17 +472,16 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	}
 
 	// Determine exact tview visual offset
-	// From reading tview TreeView source code:
-	// A node at level L has its text drawn at X = 2 + (L * 2) if root is visible.
+	// By default, tview's TreeView uses exactly 2 columns per level for its line graphics.
 	// We add 1 for our manual space.
-	textStartCol := 2 + (level * 2) + 1
+	textStartCol := (level * 2) + 1
 
 	// Ensure the size string itself is a fixed width (e.g. 9 chars for "14.5 MB" or "842 B")
 	// so that the numbers align perfectly in a vertical column, regardless of their length.
 	if sizeStr != "" {
 		sizeWidth := 9
-		if len(sizeStr) < sizeWidth {
-			sizeStr = strings.Repeat(" ", sizeWidth-len(sizeStr)) + sizeStr
+		if utf8.RuneCountInString(sizeStr) < sizeWidth {
+			sizeStr = strings.Repeat(" ", sizeWidth-utf8.RuneCountInString(sizeStr)) + sizeStr
 		}
 	}
 
@@ -497,8 +497,16 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	}
 
 	// Calculate padding to push rightBlock to the right edge.
-	// We no longer need the - 1 here, because rightBlock already includes the trailing space!
-	paddingLen := width - textStartCol - len(origName) - len(rightBlock)
+	// We use RuneCountInString because string lengths in Go are bytes, which breaks math for multibyte/UTF-8 chars!
+	nameLen := utf8.RuneCountInString(origName)
+	rightLen := utf8.RuneCountInString(rightBlock)
+
+	paddingLen := width - textStartCol - nameLen - rightLen
+	
+	// If the user's terminal draws a scrollbar on the right edge, we want to stay 1 char away
+	// from absolute 0-margin to prevent the trailing space from being eaten.
+	paddingLen -= 1
+
 	if paddingLen < 2 {
 		paddingLen = 2
 	}
