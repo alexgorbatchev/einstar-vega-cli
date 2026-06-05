@@ -1,20 +1,20 @@
 # Einstar Vega CLI
 
-A command-line tool and Terminal UI (TUI) for the Einstar Vega 3D Scanner. It allows you to explore the device's file system, view hardware details, and quickly download projects or individual files over the network.
+A command-line tool and Terminal UI (TUI) for the Einstar Vega 3D Scanner. It allows you to explore the device's file system, view hardware details, and quickly download projects or individual files over the network without having to make an account or register your device (in other words, **fuck you** Einstar).
 
-This tool is especially useful for Linux and macOS users who want to back up or extract their scanner data without relying on the official Windows software. Note that the Vega uses a proprietary project format, meaning raw files (like `mesh.beb`) cannot be directly imported into standard 3D software yet—but freeing the data from the device is the first step. Hopefully, the community will eventually be able to decode `mesh.beb` on the fly.
+Note that the Vega uses a proprietary project format, meaning raw files (like `mesh.beb`) cannot be directly imported into standard 3D software yet—but freeing the data from the device is the first step. Hopefully, the community will eventually be able to decode `mesh.beb` on the fly.
 
 Tested on firmware `v1.3.0-22`
 
 ## Installation
 
-You can download the latest pre-compiled binary for macOS, Linux, or Windows from the [Releases](https://github.com/einstar/vega-cli/releases) page.
+Download the latest pre-compiled binary for macOS, Linux, or Windows from the [Releases](https://github.com/alexgorbatchev/einstar-vega-cli/releases) page.
 
-Alternatively, you can build the tool from source (requires Go):
+1. Download the archive for your operating system (e.g., `vega-cli_Windows_x86_64.zip` or `vega-cli_Darwin_arm64.tar.gz`).
+2. Extract the archive.
+3. Run the `vega-cli` executable from your terminal.
 
-```sh
-go build -o vega-cli ./cmd/vega-cli
-```
+*(If you prefer to download via the command line, you can use the GitHub CLI: `gh release download --repo alexgorbatchev/einstar-vega-cli`)*
 
 ## Usage
 
