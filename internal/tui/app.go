@@ -59,6 +59,11 @@ func (a *App) setupUI() {
 	a.tree.SetBorder(true).SetTitle(" Files ").SetTitleAlign(tview.AlignLeft)
 	a.infoView.SetBorder(true).SetTitle(" Device Info ").SetTitleAlign(tview.AlignLeft)
 	a.logView.SetBorder(true).SetTitle(" Logs ").SetTitleAlign(tview.AlignLeft)
+	
+	// Create a help text view at the bottom
+	helpText := tview.NewTextView().
+		SetDynamicColors(true).
+		SetText(" [yellow]Space[white]: Select  [yellow]Enter[white]: Expand/Collapse  [yellow]d[white]: Download  [yellow]x[white]: Delete  [yellow]r[white]: Rename  [yellow]q[white]: Quit")
 
 	topFlex := tview.NewFlex().
 		AddItem(a.tree, 0, 1, true).
@@ -66,7 +71,8 @@ func (a *App) setupUI() {
 
 	a.layout = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(topFlex, 0, 3, true).
-		AddItem(a.logView, 0, 1, false)
+		AddItem(a.logView, 0, 1, false).
+		AddItem(helpText, 1, 0, false)
 
 	a.app.SetRoot(a.layout, true).SetFocus(a.tree)
 
@@ -94,7 +100,7 @@ func (a *App) setupUI() {
 		return event
 	})
 
-	fmt.Fprint(a.logView, "INFO: Application started. Press Space to select, 'd' to download, 'x' to delete, 'r' to rename, 'q' to quit.\n")
+	fmt.Fprint(a.logView, "INFO: Application started.\n")
 }
 
 // log writes a message to the log view safely.
