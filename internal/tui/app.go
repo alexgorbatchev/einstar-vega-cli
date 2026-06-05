@@ -428,6 +428,18 @@ func (a *App) realignNodeRecursive(node *tview.TreeNode) {
 	}
 }
 
+func getParent(root, target *tview.TreeNode) *tview.TreeNode {
+	for _, child := range root.GetChildren() {
+		if child == target {
+			return root
+		}
+		if p := getParent(child, target); p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
 func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	origName := getOriginalName(node)
 	isSelected := a.selectedNodes[node]
@@ -458,8 +470,14 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 		}
 	}
 
-	// Visual offset created by tview tree graphics (approx 4 chars per level) + 1 space we add manually
-	textStartCol := (level * 4) + 1
+	// Determine exact tview visual offset
+	// By default: Level 0 (root) has 0 graphics.
+	// Level 1: `├─` = 2 cells.
+	// Level 2: `│ ├─` = 4 cells.
+	// Level 3: `│ │ ├─` = 6 cells.
+	// General formula for tview tree node text X-coordinate (assuming default indent of 2 and root visible):
+	// textX = level * 2
+	textStartCol := (level * 2) + 1 // +1 for our manual space
 
 	// Ensure the size string itself is a fixed width (e.g. 9 chars for "14.5 MB" or "842 B")
 	// so that the numbers align perfectly in a vertical column, regardless of their length.
