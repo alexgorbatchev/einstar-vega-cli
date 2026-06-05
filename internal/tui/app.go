@@ -456,7 +456,15 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 		return
 	}
 
-	level := node.GetLevel()
+	// Calculate the exact tree level dynamically since tview's GetLevel() returns 0 
+	// for nodes that haven't been drawn on the screen yet!
+	level := 0
+	curr := node
+	for curr != nil && curr != a.tree.GetRoot() {
+		level++
+		curr = getParent(a.tree.GetRoot(), curr)
+	}
+
 	if level < 1 {
 		level = 1
 	}
