@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/einstar/vega-cli/internal/vega"
+	"github.com/alexgorbatchev/einstar-vega-cli/internal/vega"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )

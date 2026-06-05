@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/einstar/vega-cli/internal/tui"
-	"github.com/einstar/vega-cli/internal/vega"
+	"github.com/alexgorbatchev/einstar-vega-cli/internal/tui"
+	"github.com/alexgorbatchev/einstar-vega-cli/internal/vega"
 )
 
 func main() {
