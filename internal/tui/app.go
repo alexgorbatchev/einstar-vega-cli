@@ -34,6 +34,9 @@ type App struct {
 	
 	// Track selected nodes for multi-download
 	selectedNodes map[*tview.TreeNode]bool
+	
+	// Track file sizes
+	nodeSizes map[*tview.TreeNode]uint64
 
 	mu sync.Mutex
 }
@@ -49,6 +52,7 @@ func NewApp(client *vega.Client, outDir string) *App {
 		logView:       tview.NewTextView().SetDynamicColors(true).SetMaxLines(1000),
 		loadedDirs:    make(map[*tview.TreeNode]string),
 		selectedNodes: make(map[*tview.TreeNode]bool),
+		nodeSizes:     make(map[*tview.TreeNode]uint64),
 	}
 
 	a.setupUI()
@@ -153,16 +157,6 @@ func (a *App) loadData() {
 	
 	a.mu.Lock()
 	a.projects = projects
-	
-	// Add logs node based on ssdPath if available
-	if a.deviceInfo != nil {
-		if ssdPath, ok := a.deviceInfo["ssdPath"].(string); ok {
-			a.projects["Logs"] = vega.ProjectInfo{
-				Path:     filepath.Join(ssdPath, "TX3App/log"),
-				DateTime: time.Now().String(),
-			}
-		}
-	}
 	a.mu.Unlock()
 
 	a.app.QueueUpdateDraw(func() {
@@ -170,13 +164,18 @@ func (a *App) loadData() {
 			SetColor(tcell.ColorGreen).
 			SetSelectable(false)
 		
-		// Sort project names
-		var projectNames []string
-		for name := range a.projects {
-			projectNames = append(projectNames, name)
+	// Sort project names
+	var projectNames []string
+	for name := range a.projects {
+		if name == "Logs" { // Skip Logs per user request
+			continue
 		}
-		sort.Strings(projectNames)
+		projectNames = append(projectNames, name)
+	}
+	sort.Strings(projectNames)
 		
+		var projectNodes []*tview.TreeNode
+
 		for _, name := range projectNames {
 			proj := a.projects[name]
 			node := tview.NewTreeNode(" " + name + " ").
@@ -187,9 +186,13 @@ func (a *App) loadData() {
 				
 			a.loadedDirs[node] = proj.Path
 			root.AddChild(node)
+			projectNodes = append(projectNodes, node)
 		}
 		
 		a.tree.SetRoot(root).SetCurrentNode(root)
+		
+		// Kick off background scan for all projects
+		go a.backgroundScanAllProjects(projectNodes)
 	})
 	
 	a.log("INFO: Projects loaded.")
@@ -324,7 +327,7 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 		return
 	}
 
-	path, ok := ref.(string)
+	_, ok := ref.(string)
 	if !ok {
 		return
 	}
@@ -335,8 +338,8 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 	// Let's modify our logic: when a project node is selected, we fetch all files and build the subtree.
 
 	if isProjectNode(node, a.projects) {
-		node.SetColor(tcell.ColorGray)
-		go a.loadProjectFiles(node, path)
+		// Just toggle, we already load files in the background!
+		node.SetExpanded(!node.IsExpanded())
 	} else {
 		// Just toggle
 		node.SetExpanded(!node.IsExpanded())
@@ -345,11 +348,26 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 
 func getOriginalName(node *tview.TreeNode) string {
 	text := node.GetText()
+	// Strip known formatting
 	text = strings.TrimPrefix(text, " ")
+	
+	// Check if it has a size and strip it. The size is padded and formatted: ` (size)`
+	// We'll just look for the `(` character and assume it's the size if it's there.
+	// But actually, we know size is added at the end.
+	// Easiest is to regex it or simply trim ` <- ` first.
 	if strings.HasSuffix(text, " <- ") {
-		return strings.TrimSuffix(text, " <- ")
+		text = strings.TrimSuffix(text, " <- ")
+	} else {
+		text = strings.TrimSuffix(text, " ")
 	}
-	return strings.TrimSuffix(text, " ")
+
+	if idx := strings.LastIndex(text, "  "); idx != -1 {
+		// Because we padded it with spaces, we can just cut off at the first double space.
+		// Or better yet, we just remove everything from the last "  " onwards.
+		text = text[:idx]
+	}
+	
+	return strings.TrimSpace(text)
 }
 
 func isProjectNode(node *tview.TreeNode, projects map[string]vega.ProjectInfo) bool {
@@ -371,16 +389,14 @@ func (a *App) toggleSelection() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	origName := getOriginalName(node)
-
 	if a.selectedNodes[node] {
 		delete(a.selectedNodes, node)
 		a.updateNodeColor(node)
-		node.SetText(" " + origName + " ")
+		a.updateNodeText(node)
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
-		node.SetText(" " + origName + " <- ")
+		a.updateNodeText(node)
 	}
 }
 
@@ -392,34 +408,83 @@ func (a *App) updateNodeColor(node *tview.TreeNode) {
 	}
 }
 
-func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
-	ctx := context.Background()
-	a.log(fmt.Sprintf("INFO: Fetching files for %s...", getOriginalName(node)))
+func (a *App) updateNodeText(node *tview.TreeNode) {
+	origName := getOriginalName(node)
+	isSelected := a.selectedNodes[node]
 	
-	paths, err := a.client.ListFilePaths(ctx, basePath)
-	if err != nil {
-		a.log(fmt.Sprintf("[red]ERROR: fetching files:[white] %v", err))
-		a.app.QueueUpdateDraw(func() { node.SetColor(tcell.ColorYellow) })
+	a.mu.Lock()
+	size := a.nodeSizes[node]
+	a.mu.Unlock()
+
+	sizeStr := ""
+	if size > 0 || len(node.GetChildren()) == 0 { // Show 0 B for empty files, but don't show 0 B for empty dirs (unless we want to)
+		sizeStr = formatSize(size)
+	}
+
+	// Calculate depth
+	level := node.GetLevel()
+	if level < 1 {
+		level = 1
+	}
+
+	// We want the size to align around column 55. 
+	// The tree view uses some graphics: about 4 characters per level.
+	// We only pad if we're not the root node.
+	if node == a.tree.GetRoot() {
+		node.SetText(origName)
 		return
 	}
 
-		// Reconstruct the tree from flat paths
+	visualLen := (level * 4) + len(origName) + 1
+	targetCol := 60
+	
+	paddingLen := targetCol - visualLen
+	if paddingLen < 2 {
+		paddingLen = 2
+	}
+	padding := strings.Repeat(" ", paddingLen)
+
+	var newText string
+	if sizeStr != "" {
+		newText = fmt.Sprintf(" %s%s%8s ", origName, padding, sizeStr)
+	} else {
+		newText = fmt.Sprintf(" %s ", origName)
+	}
+
+	if isSelected {
+		if sizeStr != "" {
+			newText = fmt.Sprintf(" %s%s%8s <- ", origName, padding, sizeStr)
+		} else {
+			newText = fmt.Sprintf(" %s <- ", origName)
+		}
+	}
+
+	node.SetText(newText)
+}
+
+func (a *App) backgroundScanAllProjects(projectNodes []*tview.TreeNode) {
+	ctx := context.Background()
+	
+	for _, pNode := range projectNodes {
+		ref := pNode.GetReference()
+		if ref == nil {
+			continue
+		}
+		basePath := ref.(string)
+		
+		paths, err := a.client.ListFilePaths(ctx, basePath)
+		if err != nil {
+			continue
+		}
+
 		var leafNodes []*tview.TreeNode
 		a.app.QueueUpdateDraw(func() {
-			node.SetColor(tcell.ColorYellow)
-			if len(paths) == 0 {
-				a.log(fmt.Sprintf("INFO: No files found in %s", getOriginalName(node)))
-				return
-			}
-
-			leafNodes = buildTree(node, basePath, paths)
-			node.SetExpanded(true)
+			leafNodes = buildTree(pNode, basePath, paths)
 		})
 		
-		a.log(fmt.Sprintf("INFO: Loaded %d files for %s", len(paths), getOriginalName(node)))
-
-		go a.fetchFileSizes(leafNodes)
+		a.fetchFileSizes(leafNodes)
 	}
+}
 
 	// buildTree constructs a tree from a flat list of paths.
 	func buildTree(root *tview.TreeNode, basePath string, paths []string) []*tview.TreeNode {
@@ -470,47 +535,80 @@ func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
 		return leaves
 	}
 
-	func (a *App) fetchFileSizes(nodes []*tview.TreeNode) {
-		ctx := context.Background()
-		for _, node := range nodes {
-			ref := node.GetReference()
-			if ref == nil {
-				continue
-			}
-			path, ok := ref.(string)
-			if !ok {
-				continue
-			}
+func (a *App) propagateSizeUp(node *tview.TreeNode, addedSize uint64) {
+	// TreeNode doesn't have GetParent. We must search from root or traverse our own structure.
+	// We can recursively walk the tree and update all node sizes.
+	// But it's easier to just compute sizes bottom-up in a full tree pass.
+}
 
-			size, err := a.client.GetFileInfo(ctx, path)
-			if err != nil {
-				continue
-			}
-
-			sizeStr := formatSize(size)
-			
-			a.app.QueueUpdateDraw(func() {
-				origName := getOriginalName(node)
-				isSelected := a.selectedNodes[node]
-				
-				// Store the size string in a way that we can easily update the text
-				// We can just set the text directly since getOriginalName strips prefix and suffix.
-				// But wait, if we append the size, getOriginalName will return "filename (1.2 MB)".
-				// That's actually fine for leaf nodes because isProjectNode only matches projects.
-				// However, if we toggle selection, it will re-add " <- ".
-				
-				// Let's just update the text with size.
-				newText := fmt.Sprintf(" %s (%s) ", origName, sizeStr)
-				if isSelected {
-					newText = fmt.Sprintf(" %s (%s) <- ", origName, sizeStr)
-				}
-				node.SetText(newText)
-			})
-			
-			// Small sleep to not overwhelm the scanner
-			time.Sleep(50 * time.Millisecond)
-		}
+func (a *App) refreshAllNodeSizes() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	
+	root := a.tree.GetRoot()
+	if root != nil {
+		a.calcNodeSize(root)
 	}
+}
+
+func (a *App) calcNodeSize(node *tview.TreeNode) uint64 {
+	children := node.GetChildren()
+	
+	if len(children) == 0 {
+		return a.nodeSizes[node]
+	}
+
+	var total uint64
+	for _, child := range children {
+		total += a.calcNodeSize(child)
+	}
+
+	a.nodeSizes[node] = total
+	
+	a.app.QueueUpdateDraw(func() {
+		a.updateNodeText(node)
+	})
+
+	return total
+}
+
+func (a *App) fetchFileSizes(nodes []*tview.TreeNode) {
+	ctx := context.Background()
+	for i, node := range nodes {
+		ref := node.GetReference()
+		if ref == nil {
+			continue
+		}
+		path, ok := ref.(string)
+		if !ok {
+			continue
+		}
+
+		size, err := a.client.GetFileInfo(ctx, path)
+		if err != nil {
+			continue
+		}
+		
+		a.mu.Lock()
+		a.nodeSizes[node] = size
+		a.mu.Unlock()
+
+		a.app.QueueUpdateDraw(func() {
+			a.updateNodeText(node)
+		})
+		
+		// Update parent directory sizes every 10 files to avoid spamming the UI thread
+		if i % 10 == 0 {
+			go a.refreshAllNodeSizes()
+		}
+
+		// Small sleep to not overwhelm the scanner
+		time.Sleep(50 * time.Millisecond)
+	}
+	
+	// Final update
+	go a.refreshAllNodeSizes()
+}
 
 	func formatSize(b uint64) string {
 		const unit = 1024
