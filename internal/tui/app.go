@@ -392,11 +392,11 @@ func (a *App) toggleSelection() {
 	if a.selectedNodes[node] {
 		delete(a.selectedNodes, node)
 		a.updateNodeColor(node)
-		a.updateNodeText(node)
+		a.updateNodeTextLocked(node)
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
-		a.updateNodeText(node)
+		a.updateNodeTextLocked(node)
 	}
 }
 
@@ -409,12 +409,15 @@ func (a *App) updateNodeColor(node *tview.TreeNode) {
 }
 
 func (a *App) updateNodeText(node *tview.TreeNode) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.updateNodeTextLocked(node)
+}
+
+func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	origName := getOriginalName(node)
 	isSelected := a.selectedNodes[node]
-	
-	a.mu.Lock()
 	size := a.nodeSizes[node]
-	a.mu.Unlock()
 
 	sizeStr := ""
 	if size > 0 || len(node.GetChildren()) == 0 { // Show 0 B for empty files, but don't show 0 B for empty dirs (unless we want to)
@@ -477,11 +480,13 @@ func (a *App) backgroundScanAllProjects(projectNodes []*tview.TreeNode) {
 			continue
 		}
 
-		var leafNodes []*tview.TreeNode
+		done := make(chan []*tview.TreeNode)
 		a.app.QueueUpdateDraw(func() {
-			leafNodes = buildTree(pNode, basePath, paths)
+			leaves := buildTree(pNode, basePath, paths)
+			done <- leaves
 		})
 		
+		leafNodes := <-done
 		a.fetchFileSizes(leafNodes)
 	}
 }
@@ -542,16 +547,18 @@ func (a *App) propagateSizeUp(node *tview.TreeNode, addedSize uint64) {
 }
 
 func (a *App) refreshAllNodeSizes() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	
-	root := a.tree.GetRoot()
-	if root != nil {
-		a.calcNodeSize(root)
-	}
+	a.app.QueueUpdateDraw(func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		
+		root := a.tree.GetRoot()
+		if root != nil {
+			a.calcNodeSizeLocked(root)
+		}
+	})
 }
 
-func (a *App) calcNodeSize(node *tview.TreeNode) uint64 {
+func (a *App) calcNodeSizeLocked(node *tview.TreeNode) uint64 {
 	children := node.GetChildren()
 	
 	if len(children) == 0 {
@@ -560,14 +567,11 @@ func (a *App) calcNodeSize(node *tview.TreeNode) uint64 {
 
 	var total uint64
 	for _, child := range children {
-		total += a.calcNodeSize(child)
+		total += a.calcNodeSizeLocked(child)
 	}
 
 	a.nodeSizes[node] = total
-	
-	a.app.QueueUpdateDraw(func() {
-		a.updateNodeText(node)
-	})
+	a.updateNodeTextLocked(node)
 
 	return total
 }
