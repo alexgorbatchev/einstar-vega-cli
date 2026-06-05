@@ -472,9 +472,25 @@ func (a *App) updateNodeTextLocked(node *tview.TreeNode) {
 	}
 
 	// Determine exact tview visual offset
-	// By default, tview's TreeView uses exactly 2 columns per level for its line graphics.
-	// We add 1 for our manual space.
-	textStartCol := (level * 2) + 1
+	// A tview tree draws:
+	// - Nothing for root.
+	// - For level 1 (top level files): 1 string of graphics (usually `├── ` or `└── `). Since it's runewidth measured, a standard box-drawing char + space = 4 cells! Wait, tview's default indentation is actually 2 unless overridden, but the graphics prefix itself has a visual width.
+	// Let's use the exact tview formula: indent = 2 (tview default TreeNode.indent)
+	// Actually, `tview` defines `Graphics` array. The default graphics are 1 rune wide, but they are followed by spaces.
+	// Let's assume a standard graphical indentation of 4 cells per depth.
+	// If the user pasted: `│  ├── cloud.bin`
+	// Level 1: `├── ` (4 chars)
+	// Level 2: `│  ├── ` (7 chars? No, `│` ` ` ` ` `├` `─` `─` ` ` = 7 chars).
+	// Let's count from the screenshot:
+	// `├── ` (4 chars) -> level 1
+	// `│  ├── ` (7 chars) -> level 2
+	// `│  │  ├── ` (10 chars) -> level 3
+	// Math: (level * 3) + 1 ?
+	// L1: 3(1)+1 = 4. L2: 3(2)+1 = 7. L3: 3(3)+1 = 10.
+	// Exactly! tview tree indent width is `(level * 3) + 1`.
+	
+	textStartCol := (level * 3) + 1 // Add 1 for our manual space ` `
+	textStartCol += 1 // For the actual manual space in `origName` formulation
 
 	// Ensure the size string itself is a fixed width (e.g. 9 chars for "14.5 MB" or "842 B")
 	// so that the numbers align perfectly in a vertical column, regardless of their length.
