@@ -1,6 +1,6 @@
-# Einstar Vega Extractor
+# Einstar Vega CLI
 
-Relatively simple Go application to extract your projects from the Einstar Vega 3D Scanner. It uses an interactive Terminal UI (TUI) to let you explore the file system of the scanner and download projects or files.
+Relatively simple Go application to interact with your Einstar Vega 3D Scanner. It uses an interactive Terminal UI (TUI) to let you explore the file system of the scanner, check device details, and download projects or files efficiently.
 
 Could help a bit if you are using Linux. A bit - because the project format of the Vega is proprietary, so you will not be able to find there something that could be used immediately (like mesh ply files). Yeah that's not good - what's the point of having a dedicated 3D Scanner device, which is useless without PC, right? But maybe someday we will be able to decode `mesh.bib` on the fly as well.
 
@@ -31,7 +31,8 @@ If your scanner has a different IP address or you want to output files to a diff
 **TUI Controls:**
 *   `Arrow Keys` - Navigate the file tree
 *   `Enter` - Expand/collapse directories
-*   `d` - Download the selected file or directory
+*   `Space` - Multi-select files and directories
+*   `d` - Download selected (or highlighted) files/directories
 *   `q` - Quit the application
 *   `x` / `r` - Delete / Rename (Experimental - may be unsupported by the device API)
 

@@ -64,6 +64,8 @@ func NewApp(client *vega.Client, outDir string) *App {
 
 func (a *App) setupUI() {
 	a.tree.SetBorder(true).SetTitle(" Files ").SetTitleAlign(tview.AlignLeft)
+	a.tree.SetGraphicsColor(tcell.ColorSilver)
+	a.tree.SetPrefixes([]string{" "})
 	a.infoView.SetBorder(true).SetTitle(" Device Info ").SetTitleAlign(tview.AlignLeft)
 	a.logView.SetBorder(true).SetTitle(" Logs ").SetTitleAlign(tview.AlignLeft)
 
