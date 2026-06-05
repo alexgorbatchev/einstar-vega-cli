@@ -226,11 +226,11 @@ func (a *App) updateDeviceInfo() {
 		for k, v := range a.deviceInfo {
 			switch k {
 			case "deviceParams":
-				a.drawMultiValueSection("Device Parameters", val, maxLen)
+				deviceParams = v
 			case "boardInfo":
-				a.drawMultiValueSection("Board Info", val, maxLen)
+				boardInfo = v
 			default:
-				_, _ = fmt.Fprintf(a.infoView, "[blue]%-*s[white] %v\n", maxLen+1, k+":", val)
+				regularKeys = append(regularKeys, k)
 			}
 		}
 
