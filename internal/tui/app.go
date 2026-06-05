@@ -117,7 +117,7 @@ func (a *App) setupUI() {
 		return event
 	})
 
-	fmt.Fprint(a.logView, "INFO: Application started.\n")
+	_, _ = fmt.Fprint(a.logView, "INFO: Application started.\n")
 }
 
 // log writes a message to the log view safely.
@@ -126,7 +126,7 @@ func (a *App) log(msg string) {
 	
 	// Safe to call from background goroutines
 	a.app.QueueUpdateDraw(func() {
-		fmt.Fprint(a.logView, txt)
+		_, _ = fmt.Fprint(a.logView, txt)
 		a.logView.ScrollToEnd()
 	})
 }
@@ -136,9 +136,9 @@ func (a *App) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	fmt.Fprint(a.logView, "INFO: Connecting to device...\n")
+	_, _ = fmt.Fprint(a.logView, "INFO: Connecting to device...\n")
 	if err := a.client.Connect(ctx); err != nil {
-		fmt.Fprintf(a.logView, "[red]ERROR: Could not connect:[white] %v\n", err)
+		_, _ = fmt.Fprintf(a.logView, "[red]ERROR: Could not connect:[white] %v\n", err)
 	} else {
 		fmt.Fprint(a.logView, "[green]INFO: Connected successfully.[white]\n")
 		go a.loadData()
@@ -214,7 +214,7 @@ func (a *App) loadData() {
 func (a *App) updateDeviceInfo() {
 	a.app.QueueUpdateDraw(func() {
 		a.infoView.Clear()
-		fmt.Fprintf(a.infoView, "[yellow]Einstar Vega[white]\n\n")
+		_, _ = fmt.Fprintf(a.infoView, "[yellow]Einstar Vega[white]\n\n")
 		
 		a.mu.Lock()
 		defer a.mu.Unlock()
@@ -224,12 +224,13 @@ func (a *App) updateDeviceInfo() {
 		var boardInfo interface{}
 
 		for k, v := range a.deviceInfo {
-			if k == "deviceParams" {
-				deviceParams = v
-			} else if k == "boardInfo" {
-				boardInfo = v
-			} else {
-				regularKeys = append(regularKeys, k)
+			switch k {
+			case "deviceParams":
+				a.drawMultiValueSection("Device Parameters", val, maxLen)
+			case "boardInfo":
+				a.drawMultiValueSection("Board Info", val, maxLen)
+			default:
+				_, _ = fmt.Fprintf(a.infoView, "[blue]%-*s[white] %v\n", maxLen+1, k+":", val)
 			}
 		}
 
@@ -249,79 +250,52 @@ func (a *App) updateDeviceInfo() {
 					val = fmt.Sprintf("%.0f%%", vF*100)
 				}
 			}
-			fmt.Fprintf(a.infoView, "[blue]%-*s[white] %v\n", maxLen+1, k+":", val)
+			_, _ = fmt.Fprintf(a.infoView, "[blue]%-*s[white] %v\n", maxLen+1, k+":", val)
 		}
 
 		if deviceParams != nil {
-			fmt.Fprintf(a.infoView, "\n[yellow]Device Params[white]\n")
+			_, _ = fmt.Fprintf(a.infoView, "\n[yellow]Device Params[white]\n")
 			if dpStr, ok := deviceParams.(string); ok {
 				parts := strings.Split(dpStr, "_")
 				var parsedParts []struct{k, v string}
 				maxPLen := 0
 				for _, p := range parts {
-					p = strings.TrimSpace(p)
-					if p == "" {
-						continue
-					}
-					if idx := strings.Index(p, ":"); idx != -1 {
-						k := strings.TrimSpace(p[:idx])
-						v := strings.TrimSpace(p[idx+1:])
-						parsedParts = append(parsedParts, struct{k, v string}{k, v})
-						if len(k) > maxPLen {
-							maxPLen = len(k)
-						}
+					if kv := strings.SplitN(p, ":", 2); len(kv) == 2 {
+						if len(kv[0]) > maxPLen { maxPLen = len(kv[0]) }
+						parsedParts = append(parsedParts, struct{k, v string}{kv[0], kv[1]})
 					} else {
+						if len(p) > maxPLen { maxPLen = len(p) }
 						parsedParts = append(parsedParts, struct{k, v string}{p, ""})
 					}
 				}
 				for _, p := range parsedParts {
 					if p.v != "" {
-						fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %s\n", maxPLen+1, p.k+":", p.v)
+						_, _ = fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %s\n", maxPLen+1, p.k+":", p.v)
 					} else {
-						fmt.Fprintf(a.infoView, "  [blue]%s[white]\n", p.k)
+						_, _ = fmt.Fprintf(a.infoView, "  [blue]%s[white]\n", p.k)
 					}
 				}
 			} else {
-				fmt.Fprintf(a.infoView, "  %v\n", deviceParams)
+				_, _ = fmt.Fprintf(a.infoView, "  %v\n", deviceParams)
 			}
 		}
 
 		if boardInfo != nil {
-			fmt.Fprintf(a.infoView, "\n[yellow]Board Info[white]\n")
+			_, _ = fmt.Fprintf(a.infoView, "\n[yellow]Board Info[white]\n")
 			switch val := boardInfo.(type) {
 			case map[string]interface{}:
 				var keys []string
 				maxBLen := 0
 				for k := range val {
 					keys = append(keys, k)
-					if len(k) > maxBLen {
-						maxBLen = len(k)
-					}
+					if len(k) > maxBLen { maxBLen = len(k) }
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %v\n", maxBLen+1, k+":", val[k])
-				}
-			case map[interface{}]interface{}:
-				type kv struct {
-					k string
-					v interface{}
-				}
-				var kvs []kv
-				maxBLen := 0
-				for k, v := range val {
-					kStr := fmt.Sprintf("%v", k)
-					kvs = append(kvs, kv{kStr, v})
-					if len(kStr) > maxBLen {
-						maxBLen = len(kStr)
-					}
-				}
-				sort.Slice(kvs, func(i, j int) bool { return kvs[i].k < kvs[j].k })
-				for _, pair := range kvs {
-					fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %v\n", maxBLen+1, pair.k+":", pair.v)
+					_, _ = fmt.Fprintf(a.infoView, "  [blue]%-*s[white] %v\n", maxBLen+1, k+":", val[k])
 				}
 			default:
-				fmt.Fprintf(a.infoView, "  %v\n", boardInfo)
+				_, _ = fmt.Fprintf(a.infoView, "  %v\n", boardInfo)
 			}
 		}
 	})
@@ -848,7 +822,9 @@ func (a *App) downloadSingleFile(absPath, basePath string) {
 		a.log(fmt.Sprintf("[red]ERROR: creating file %s:[white] %v", rel, err))
 		return
 	}
-	defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 	a.log(fmt.Sprintf("INFO: Downloading %s (%.2f MB)...", rel, float64(size)/1048576))
 	

@@ -39,7 +39,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("connecting to device: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 15))
 	if err != nil {
@@ -67,7 +69,9 @@ func (c *Client) GetDeviceInfo(ctx context.Context) (DeviceInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting device info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var data struct {
 		Result DeviceInfo `cbor:"result"`
@@ -96,7 +100,9 @@ func (c *Client) GetProjectsInfo(ctx context.Context) (map[string]ProjectInfo, e
 	if err != nil {
 		return nil, fmt.Errorf("getting projects info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var data struct {
 		Result map[string]ProjectInfo `cbor:"result"`
@@ -125,7 +131,9 @@ func (c *Client) ListFilePaths(ctx context.Context, path string) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("listing file paths: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var data struct {
 		Result []interface{} `cbor:"result"`
@@ -164,7 +172,9 @@ func (c *Client) GetFileInfo(ctx context.Context, path string) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("getting file info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var size uint64
 	if err := binary.Read(resp.Body, binary.BigEndian, &size); err != nil {
@@ -198,7 +208,9 @@ func (c *Client) DownloadFile(ctx context.Context, path string, size uint64, w i
 	if err != nil {
 		return fmt.Errorf("downloading file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code downloading file: %d", resp.StatusCode)
