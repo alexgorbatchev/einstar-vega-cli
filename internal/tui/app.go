@@ -346,8 +346,8 @@ func (a *App) onTreeSelected(node *tview.TreeNode) {
 func getOriginalName(node *tview.TreeNode) string {
 	text := node.GetText()
 	text = strings.TrimPrefix(text, " ")
-	if strings.HasSuffix(text, "* ") {
-		return strings.TrimSuffix(text, "* ")
+	if strings.HasSuffix(text, " <- ") {
+		return strings.TrimSuffix(text, " <- ")
 	}
 	return strings.TrimSuffix(text, " ")
 }
@@ -380,7 +380,7 @@ func (a *App) toggleSelection() {
 	} else {
 		a.selectedNodes[node] = true
 		node.SetColor(tcell.ColorAqua) // Mark as selected
-		node.SetText(" " + origName + "* ")
+		node.SetText(" " + origName + " <- ")
 	}
 }
 
@@ -403,66 +403,127 @@ func (a *App) loadProjectFiles(node *tview.TreeNode, basePath string) {
 		return
 	}
 
-	// Reconstruct the tree from flat paths
-	a.app.QueueUpdateDraw(func() {
-		node.SetColor(tcell.ColorYellow)
-		if len(paths) == 0 {
-			a.log(fmt.Sprintf("INFO: No files found in %s", getOriginalName(node)))
-			return
-		}
-
-		buildTree(node, basePath, paths)
-		node.SetExpanded(true)
-	})
-	
-	a.log(fmt.Sprintf("INFO: Loaded %d files for %s", len(paths), getOriginalName(node)))
-}
-
-// buildTree constructs a tree from a flat list of paths.
-func buildTree(root *tview.TreeNode, basePath string, paths []string) {
-	// Simple map-based approach to build the tree.
-	nodes := make(map[string]*tview.TreeNode)
-	nodes[""] = root // root corresponds to basePath
-
-	// Sort paths so we iterate in deterministic alphabetical order
-	sort.Strings(paths)
-
-	for _, p := range paths {
-		// Remove basePath from p to get relative path
-		rel, err := filepath.Rel(basePath, p)
-		if err != nil {
-			rel = p // Fallback
-		}
-
-		parts := strings.Split(filepath.ToSlash(rel), "/")
-		currentPath := ""
-		
-		for i, part := range parts {
-			parentPath := currentPath
-			if currentPath == "" {
-				currentPath = part
-			} else {
-				currentPath = currentPath + "/" + part
+		// Reconstruct the tree from flat paths
+		var leafNodes []*tview.TreeNode
+		a.app.QueueUpdateDraw(func() {
+			node.SetColor(tcell.ColorYellow)
+			if len(paths) == 0 {
+				a.log(fmt.Sprintf("INFO: No files found in %s", getOriginalName(node)))
+				return
 			}
+
+			leafNodes = buildTree(node, basePath, paths)
+			node.SetExpanded(true)
+		})
+		
+		a.log(fmt.Sprintf("INFO: Loaded %d files for %s", len(paths), getOriginalName(node)))
+
+		go a.fetchFileSizes(leafNodes)
+	}
+
+	// buildTree constructs a tree from a flat list of paths.
+	func buildTree(root *tview.TreeNode, basePath string, paths []string) []*tview.TreeNode {
+		// Simple map-based approach to build the tree.
+		nodes := make(map[string]*tview.TreeNode)
+		nodes[""] = root // root corresponds to basePath
+		var leaves []*tview.TreeNode
+
+		// Sort paths so we iterate in deterministic alphabetical order
+		sort.Strings(paths)
+
+		for _, p := range paths {
+			// Remove basePath from p to get relative path
+			rel, err := filepath.Rel(basePath, p)
+			if err != nil {
+				rel = p // Fallback
+			}
+
+			parts := strings.Split(filepath.ToSlash(rel), "/")
+			currentPath := ""
 			
-			if _, exists := nodes[currentPath]; !exists {
-				node := tview.NewTreeNode(" " + part + " ").
-					SetSelectable(true).
-					SetExpanded(false).
-					SetReference(p) // absolute path
-				
-				if i == len(parts)-1 {
-					node.SetColor(tcell.ColorWhite) // File
+			for i, part := range parts {
+				parentPath := currentPath
+				if currentPath == "" {
+					currentPath = part
 				} else {
-					node.SetColor(tcell.ColorYellow) // Dir
+					currentPath = currentPath + "/" + part
 				}
 				
-				nodes[currentPath] = node
-				nodes[parentPath].AddChild(node)
+				if _, exists := nodes[currentPath]; !exists {
+					node := tview.NewTreeNode(" " + part + " ").
+						SetSelectable(true).
+						SetExpanded(false).
+						SetReference(p) // absolute path
+					
+					if i == len(parts)-1 {
+						node.SetColor(tcell.ColorWhite) // File
+						leaves = append(leaves, node)
+					} else {
+						node.SetColor(tcell.ColorYellow) // Dir
+					}
+					
+					nodes[currentPath] = node
+					nodes[parentPath].AddChild(node)
+				}
 			}
 		}
+		return leaves
 	}
-}
+
+	func (a *App) fetchFileSizes(nodes []*tview.TreeNode) {
+		ctx := context.Background()
+		for _, node := range nodes {
+			ref := node.GetReference()
+			if ref == nil {
+				continue
+			}
+			path, ok := ref.(string)
+			if !ok {
+				continue
+			}
+
+			size, err := a.client.GetFileInfo(ctx, path)
+			if err != nil {
+				continue
+			}
+
+			sizeStr := formatSize(size)
+			
+			a.app.QueueUpdateDraw(func() {
+				origName := getOriginalName(node)
+				isSelected := a.selectedNodes[node]
+				
+				// Store the size string in a way that we can easily update the text
+				// We can just set the text directly since getOriginalName strips prefix and suffix.
+				// But wait, if we append the size, getOriginalName will return "filename (1.2 MB)".
+				// That's actually fine for leaf nodes because isProjectNode only matches projects.
+				// However, if we toggle selection, it will re-add " <- ".
+				
+				// Let's just update the text with size.
+				newText := fmt.Sprintf(" %s (%s) ", origName, sizeStr)
+				if isSelected {
+					newText = fmt.Sprintf(" %s (%s) <- ", origName, sizeStr)
+				}
+				node.SetText(newText)
+			})
+			
+			// Small sleep to not overwhelm the scanner
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+
+	func formatSize(b uint64) string {
+		const unit = 1024
+		if b < unit {
+			return fmt.Sprintf("%d B", b)
+		}
+		div, exp := int64(unit), 0
+		for n := b / unit; n >= unit; n /= unit {
+			div *= unit
+			exp++
+		}
+		return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+	}
 
 // downloadSelected triggers downloading the selected file or directory.
 func (a *App) downloadSelected() {
