@@ -56,9 +56,9 @@ func NewApp(client *vega.Client, outDir string) *App {
 }
 
 func (a *App) setupUI() {
-	a.tree.SetBorder(true).SetTitle(" Files ")
-	a.infoView.SetBorder(true).SetTitle(" Device Info ")
-	a.logView.SetBorder(true).SetTitle(" Logs ")
+	a.tree.SetBorder(true).SetTitle(" Files ").SetTitleAlign(tview.AlignLeft)
+	a.infoView.SetBorder(true).SetTitle(" Device Info ").SetTitleAlign(tview.AlignLeft)
+	a.logView.SetBorder(true).SetTitle(" Logs ").SetTitleAlign(tview.AlignLeft)
 
 	topFlex := tview.NewFlex().
 		AddItem(a.tree, 0, 1, true).
@@ -197,8 +197,74 @@ func (a *App) updateDeviceInfo() {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		
+		var regularKeys []string
+		var deviceParams interface{}
+		var boardInfo interface{}
+
 		for k, v := range a.deviceInfo {
-			fmt.Fprintf(a.infoView, "[blue]%s:[white] %v\n", k, v)
+			if k == "deviceParams" {
+				deviceParams = v
+			} else if k == "boardInfo" {
+				boardInfo = v
+			} else {
+				regularKeys = append(regularKeys, k)
+			}
+		}
+
+		sort.Strings(regularKeys)
+
+		for _, k := range regularKeys {
+			fmt.Fprintf(a.infoView, "[blue]%s:[white] %v\n", k, a.deviceInfo[k])
+		}
+
+		if deviceParams != nil {
+			fmt.Fprintf(a.infoView, "\n[yellow]Device Params[white]\n")
+			if dpStr, ok := deviceParams.(string); ok {
+				parts := strings.Split(dpStr, "_")
+				for _, p := range parts {
+					p = strings.TrimSpace(p)
+					if p == "" {
+						continue
+					}
+					if idx := strings.Index(p, ":"); idx != -1 {
+						fmt.Fprintf(a.infoView, "  [blue]%s:[white] %s\n", strings.TrimSpace(p[:idx]), strings.TrimSpace(p[idx+1:]))
+					} else {
+						fmt.Fprintf(a.infoView, "  [blue]%s[white]\n", p)
+					}
+				}
+			} else {
+				fmt.Fprintf(a.infoView, "  %v\n", deviceParams)
+			}
+		}
+
+		if boardInfo != nil {
+			fmt.Fprintf(a.infoView, "\n[yellow]Board Info[white]\n")
+			switch val := boardInfo.(type) {
+			case map[string]interface{}:
+				var keys []string
+				for k := range val {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					fmt.Fprintf(a.infoView, "  [blue]%s:[white] %v\n", k, val[k])
+				}
+			case map[interface{}]interface{}:
+				type kv struct {
+					k string
+					v interface{}
+				}
+				var kvs []kv
+				for k, v := range val {
+					kvs = append(kvs, kv{fmt.Sprintf("%v", k), v})
+				}
+				sort.Slice(kvs, func(i, j int) bool { return kvs[i].k < kvs[j].k })
+				for _, pair := range kvs {
+					fmt.Fprintf(a.infoView, "  [blue]%s:[white] %v\n", pair.k, pair.v)
+				}
+			default:
+				fmt.Fprintf(a.infoView, "  %v\n", boardInfo)
+			}
 		}
 	})
 }
