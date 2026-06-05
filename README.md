@@ -8,7 +8,9 @@ Tested on firmware `v1.3.0-22`
 
 ## Installation
 
-You can build the tool from source (requires Go):
+You can download the latest pre-compiled binary for macOS, Linux, or Windows from the [Releases](https://github.com/einstar/vega-cli/releases) page.
+
+Alternatively, you can build the tool from source (requires Go):
 
 ```sh
 go build -o vega-cli ./cmd/vega-cli
@@ -35,6 +37,10 @@ If your scanner has a different IP address or you want to output files to a diff
 *   `d` - Download selected (or highlighted) files/directories
 *   `q` - Quit the application
 *   `x` / `r` - Delete / Rename (Experimental - may be unsupported by the device API)
+
+## Acknowledgements
+
+This Go implementation was inspired by the original Python extraction script: [Tigra-10/einstar-vega-extract](https://github.com/Tigra-10/einstar-vega-extract)
 
 ## Details
 
