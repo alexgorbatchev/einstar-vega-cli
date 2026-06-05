@@ -480,14 +480,12 @@ func (a *App) backgroundScanAllProjects(projectNodes []*tview.TreeNode) {
 			continue
 		}
 
-		done := make(chan []*tview.TreeNode)
 		a.app.QueueUpdateDraw(func() {
 			leaves := buildTree(pNode, basePath, paths)
-			done <- leaves
+			// Spawn a new goroutine for fetching sizes so we don't block the UI thread
+			// and we don't need any channel synchronization!
+			go a.fetchFileSizes(leaves)
 		})
-		
-		leafNodes := <-done
-		a.fetchFileSizes(leafNodes)
 	}
 }
 
@@ -578,7 +576,7 @@ func (a *App) calcNodeSizeLocked(node *tview.TreeNode) uint64 {
 
 func (a *App) fetchFileSizes(nodes []*tview.TreeNode) {
 	ctx := context.Background()
-	for i, node := range nodes {
+	for _, node := range nodes {
 		ref := node.GetReference()
 		if ref == nil {
 			continue
@@ -600,18 +598,13 @@ func (a *App) fetchFileSizes(nodes []*tview.TreeNode) {
 		a.app.QueueUpdateDraw(func() {
 			a.updateNodeText(node)
 		})
-		
-		// Update parent directory sizes every 10 files to avoid spamming the UI thread
-		if i % 10 == 0 {
-			go a.refreshAllNodeSizes()
-		}
 
 		// Small sleep to not overwhelm the scanner
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 	}
 	
-	// Final update
-	go a.refreshAllNodeSizes()
+	// Final update for this project
+	a.refreshAllNodeSizes()
 }
 
 	func formatSize(b uint64) string {
