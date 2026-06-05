@@ -1,14 +1,14 @@
 # Einstar Vega CLI
 
-Relatively simple Go application to interact with your Einstar Vega 3D Scanner. It uses an interactive Terminal UI (TUI) to let you explore the file system of the scanner, check device details, and download projects or files efficiently.
+A command-line tool and Terminal UI (TUI) for the Einstar Vega 3D Scanner. It allows you to explore the device's file system, view hardware details, and quickly download projects or individual files over the network.
 
-Could help a bit if you are using Linux. A bit - because the project format of the Vega is proprietary, so you will not be able to find there something that could be used immediately (like mesh ply files). Yeah that's not good - what's the point of having a dedicated 3D Scanner device, which is useless without PC, right? But maybe someday we will be able to decode `mesh.bib` on the fly as well.
+This tool is especially useful for Linux and macOS users who want to back up or extract their scanner data without relying on the official Windows software. Note that the Vega uses a proprietary project format, meaning raw files (like `mesh.beb`) cannot be directly imported into standard 3D software yet—but freeing the data from the device is the first step. Hopefully, the community will eventually be able to decode `mesh.beb` on the fly.
 
-Tested on `v1.3.0-22`
+Tested on firmware `v1.3.0-22`
 
 ## Installation
 
-You need [Go](https://go.dev/) to build the binary.
+You can build the tool from source (requires Go):
 
 ```sh
 go build -o vega-cli ./cmd/vega-cli
