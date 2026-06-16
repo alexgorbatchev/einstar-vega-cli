@@ -20,6 +20,7 @@ You can configure the scanner connection either via command-line flags or enviro
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|
 | `--ip` | `VEGA_IP` | (none) | **Required** - The IP address of the Einstar Vega scanner |
+| `--port`, `-p` | `VEGA_PORT` | `8080` | Port used by the Einstar Vega scanner or mock server |
 | `--output`, `-o` | `VEGA_OUTPUT` | `projects` | Directory where downloaded files and projects will be stored |
 
 ## Usage
@@ -75,15 +76,15 @@ Download an entire project (or all projects) directly from the command line:
 ### 3. Local Offline Mock Server
 Start a mock scanner API server on your local machine to test or inspect the CLI/TUI:
 ```sh
-# Starts mock server on port 8080
+# Starts mock server on port 8080 (default)
 ./vega-cli mock
 
 # Start on a custom port
 ./vega-cli mock --port 9090
 ```
-With the mock server running, you can connect the CLI/TUI to it locally:
+With the mock server running on a custom port, you can connect the CLI/TUI to it locally:
 ```sh
-./vega-cli --ip localhost
+./vega-cli --ip localhost --port 9090
 ```
 
 ## Acknowledgements
