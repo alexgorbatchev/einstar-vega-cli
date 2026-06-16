@@ -1,8 +1,6 @@
-# Einstar Vega CLI
+# Einstar Vega Downloader
 
-A command-line tool and Terminal UI (TUI) for the Einstar Vega 3D Scanner. It allows you to explore the device's file system, view hardware details, and quickly download projects or individual files over the network without having to make an account or register your device (in other words, **fuck you** Einstar).
-
-Note that the Vega uses a proprietary project format, meaning raw files (like `mesh.beb`) cannot be directly imported into standard 3D software yet—but freeing the data from the device is the first step. Hopefully, the community will eventually be able to decode `mesh.beb` on the fly.
+A CLI tool and Terminal UI (TUI) to download files from Einstar Vega 3D Scanner **without having to make an account or register your device**. Because frankly, **fuck you** Einstar, I shouldn't have to make an account to use a 3D scanner.
 
 Tested on firmware `v1.3.0-22`
 
@@ -12,22 +10,32 @@ Download the latest pre-compiled binary for macOS, Linux, or Windows from the [R
 
 1. Download the archive for your operating system (e.g., `vega-cli_Windows_x86_64.zip` or `vega-cli_Darwin_arm64.tar.gz`).
 2. Extract the archive.
-3. Run the `vega-cli` executable from your terminal.
+3. Plug in the scanner using a high-speed USB-C cable (otherwise transferring large point cloud data will take forever).
+4. Run the `vega-cli` executable from your terminal.
 
-*(If you prefer to download via the command line, you can use the GitHub CLI: `gh release download --repo alexgorbatchev/einstar-vega-cli`)*
+## Configuration
+
+You can configure the scanner connection either via command-line flags or environment variables:
+
+| Flag | Environment Variable | Default | Description |
+|------|----------------------|---------|-------------|
+| `--ip` | `VEGA_IP` | (none) | **Required** - The IP address of the Einstar Vega scanner |
+| `--output`, `-o` | `VEGA_OUTPUT` | `projects` | Directory where downloaded files and projects will be stored |
 
 ## Usage
 
-Just connect your camera via cable and run the binary - it will open an interactive UI that shows the available projects.
+### 1. Interactive Terminal UI (TUI)
+
+To launch the full interactive interface to explore and select folders/files to download:
 
 ```sh
-./vega-cli
+./vega-cli --ip <scanner_ip>
 ```
 
-If your scanner has a different IP address or you want to output files to a different directory:
-
+Alternatively, set the environment variable:
 ```sh
-./vega-cli -a 192.168.1.100 -o /my/custom/output
+export VEGA_IP=192.168.30.3
+./vega-cli
 ```
 
 **TUI Controls:**
@@ -38,9 +46,49 @@ If your scanner has a different IP address or you want to output files to a diff
 *   `q` - Quit the application
 *   `x` / `r` - Delete / Rename (Experimental - may be unsupported by the device API)
 
+### 2. Headless CLI Subcommands
+
+For automation, scripting, or quick inspection, `vega-cli` provides headless subcommands that don't launch the TUI:
+
+#### List Available Projects
+List all projects stored on the scanner with their paths and timestamps:
+```sh
+./vega-cli projects --ip <scanner_ip>
+```
+
+#### Get Scanner Hardware Status
+Display hardware/firmware details, battery level, storage paths, and active state:
+```sh
+./vega-cli info --ip <scanner_ip>
+```
+
+#### Direct Headless Download
+Download an entire project (or all projects) directly from the command line:
+```sh
+# Download a specific project
+./vega-cli download "Project1" --ip <scanner_ip> --output ./my-scans
+
+# Download all available projects
+./vega-cli download --all --ip <scanner_ip>
+```
+
+### 3. Local Offline Mock Server
+Start a mock scanner API server on your local machine to test or inspect the CLI/TUI:
+```sh
+# Starts mock server on port 8080
+./vega-cli mock
+
+# Start on a custom port
+./vega-cli mock --port 9090
+```
+With the mock server running, you can connect the CLI/TUI to it locally:
+```sh
+./vega-cli --ip localhost
+```
+
 ## Acknowledgements
 
-This Go implementation was inspired by the original Python extraction script: [Tigra-10/einstar-vega-extract](https://github.com/Tigra-10/einstar-vega-extract)
+This Go implementation is a rewrite of the original Python [rabits/einstar-vega-extract](https://github.com/rabits/einstar-vega-extract) script. 
 
 ## Details
 
