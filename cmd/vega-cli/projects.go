@@ -45,12 +45,12 @@ var projectsCmd = &cobra.Command{
 		sort.Strings(names)
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "NAME\tPATH\tDATE TIME")
+		_, _ = fmt.Fprintln(w, "NAME\tPATH\tDATE TIME")
 		for _, name := range names {
 			p := projects[name]
-			fmt.Fprintf(w, "%s\t%s\t%s\n", name, p.Path, p.DateTime)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", name, p.Path, p.DateTime)
 		}
-		w.Flush()
+		_ = w.Flush()
 
 		return nil
 	},

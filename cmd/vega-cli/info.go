@@ -48,9 +48,9 @@ var infoCmd = &cobra.Command{
 		sort.Strings(keys)
 
 		for _, k := range keys {
-			fmt.Fprintf(w, "%s:\t%v\n", k, info[k])
+			_, _ = fmt.Fprintf(w, "%s:\t%v\n", k, info[k])
 		}
-		w.Flush()
+		_ = w.Flush()
 
 		return nil
 	},
