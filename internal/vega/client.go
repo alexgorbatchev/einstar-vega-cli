@@ -30,7 +30,7 @@ func NewClient(addr string) *Client {
 
 // Connect verifies connection to the device.
 func (c *Client) Connect(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s:8080/connect", c.addr), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s/connect", c.addr), nil)
 	if err != nil {
 		return fmt.Errorf("creating connect request: %w", err)
 	}
@@ -60,7 +60,7 @@ type DeviceInfo map[string]interface{}
 
 // GetDeviceInfo retrieves device information.
 func (c *Client) GetDeviceInfo(ctx context.Context) (DeviceInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s:8080/request/deviceInfo", c.addr), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s/request/deviceInfo", c.addr), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating device info request: %w", err)
 	}
@@ -91,7 +91,7 @@ type ProjectInfo struct {
 
 // GetProjectsInfo retrieves all projects from the device.
 func (c *Client) GetProjectsInfo(ctx context.Context) (map[string]ProjectInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s:8080/request/projectsInfo", c.addr), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s/request/projectsInfo", c.addr), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating projects info request: %w", err)
 	}
@@ -122,7 +122,7 @@ func (c *Client) ListFilePaths(ctx context.Context, path string) ([]string, erro
 		return nil, fmt.Errorf("marshaling list paths request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s:8080/request/listFilePaths", c.addr), bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/request/listFilePaths", c.addr), bytes.NewReader(b))
 	if err != nil {
 		return nil, fmt.Errorf("creating list paths request: %w", err)
 	}
@@ -163,7 +163,7 @@ func (c *Client) ListFilePaths(ctx context.Context, path string) ([]string, erro
 
 // GetFileInfo retrieves size information for a file.
 func (c *Client) GetFileInfo(ctx context.Context, path string) (uint64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s:8080/file/info", c.addr), bytes.NewReader([]byte(path)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/file/info", c.addr), bytes.NewReader([]byte(path)))
 	if err != nil {
 		return 0, fmt.Errorf("creating file info request: %w", err)
 	}
@@ -197,7 +197,7 @@ func (c *Client) DownloadFile(ctx context.Context, path string, size uint64, w i
 		return fmt.Errorf("marshaling download request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s:8080/file/content", c.addr), bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/file/content", c.addr), bytes.NewReader(b))
 	if err != nil {
 		return fmt.Errorf("creating download request: %w", err)
 	}
