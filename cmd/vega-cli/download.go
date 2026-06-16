@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -22,6 +23,7 @@ If no project name is provided, you can use the --all flag to download all avail
 		if ip == "" {
 			return fmt.Errorf("--ip is required (or set VEGA_IP environment variable)")
 		}
+		port := viper.GetString("port")
 		outDir := viper.GetString("output")
 
 		downloadAll, _ := cmd.Flags().GetBool("all")
@@ -29,7 +31,7 @@ If no project name is provided, you can use the --all flag to download all avail
 			return fmt.Errorf("either a project name must be specified or --all flag must be set")
 		}
 
-		client := vega.NewClient(ip)
+		client := vega.NewClient(net.JoinHostPort(ip, port))
 		ctx := context.Background()
 
 		fmt.Println("Connecting to Einstar Vega scanner...")

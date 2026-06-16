@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"text/tabwriter"
@@ -21,8 +22,9 @@ var projectsCmd = &cobra.Command{
 		if ip == "" {
 			return fmt.Errorf("--ip is required (or set VEGA_IP environment variable)")
 		}
+		port := viper.GetString("port")
 
-		client := vega.NewClient(ip)
+		client := vega.NewClient(net.JoinHostPort(ip, port))
 		ctx := context.Background()
 
 		projects, err := client.GetProjectsInfo(ctx)

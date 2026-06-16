@@ -8,6 +8,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var mockCmd = &cobra.Command{
@@ -15,7 +16,7 @@ var mockCmd = &cobra.Command{
 	Short: "Start a mock Einstar Vega API server for local testing",
 	Long:  `Start a mock Einstar Vega HTTP API server on port 8080 (or custom port) for local offline testing and TUI development.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		port, _ := cmd.Flags().GetString("port")
+		port := viper.GetString("port")
 
 		http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("connect success"))
@@ -82,6 +83,5 @@ var mockCmd = &cobra.Command{
 }
 
 func init() {
-	mockCmd.Flags().StringP("port", "p", "8080", "Port to listen on")
 	rootCmd.AddCommand(mockCmd)
 }

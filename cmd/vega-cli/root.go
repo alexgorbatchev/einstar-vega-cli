@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/alexgorbatchev/einstar-vega-cli/internal/tui"
@@ -23,9 +24,10 @@ and download projects or individual files over the network without having to reg
 			if ip == "" {
 				return fmt.Errorf("--ip is required (or set VEGA_IP environment variable)")
 			}
+			port := viper.GetString("port")
 			outDir := viper.GetString("output")
 
-			client := vega.NewClient(ip)
+			client := vega.NewClient(net.JoinHostPort(ip, port))
 			app := tui.NewApp(client, outDir)
 			if err := app.Run(); err != nil {
 				return fmt.Errorf("running TUI: %w", err)
@@ -39,9 +41,11 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().String("ip", "", "device IP address (can be set via VEGA_IP)")
+	rootCmd.PersistentFlags().StringP("port", "p", "8080", "device port (can be set via VEGA_PORT)")
 	rootCmd.PersistentFlags().StringP("output", "o", "projects", "output directory where to store projects (can be set via VEGA_OUTPUT)")
 
 	_ = viper.BindPFlag("ip", rootCmd.PersistentFlags().Lookup("ip"))
+	_ = viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
 	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 }
 
